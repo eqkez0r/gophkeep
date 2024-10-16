@@ -5,11 +5,11 @@ import (
 )
 
 type config struct {
-	DatabaseType string
-	DatabaseURL  string
+	DatabaseType string `json:"database_type" yaml:"database_type" env:"database_type"`
+	DatabaseURL  string `json:"database_url" yaml:"database_url" env:"database_url"`
 }
 
-func initCfg() (*config, error) {
+func initConfig() (*config, error) {
 	const defaultPath = "./config.yaml"
 
 	cfg := &config{}

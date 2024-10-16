@@ -1,4 +1,4 @@
-package text
+package models
 
 type Text struct {
 	TextName string

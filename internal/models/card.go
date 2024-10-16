@@ -1,4 +1,4 @@
-package card
+package models
 
 type Card struct {
 	CardName       string `json:"card_name"`

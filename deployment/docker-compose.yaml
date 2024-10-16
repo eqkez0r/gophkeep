@@ -1,0 +1,23 @@
+services:
+
+  postgresql:
+    image: postgres:16-alpine
+    restart: always
+    container_name: gophkeeper_db
+    environment:
+      - POSTGRES_DB=gophkeeper
+      - POSTGRES_USER=postgres
+      - POSTGRES_PASSWORD=postgres
+      - PGDATA=/var/lib/postgresql/data
+    ports:
+      - "127.0.0.1:5432:5432"
+    volumes:
+      - ./data:/var/lib/postgresql/data
+
+  gophkeeper_services:
+    image: go
+    depends_on:
+      - postgresql
+
+networks:
+  ns:
