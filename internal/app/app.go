@@ -3,7 +3,6 @@ package app
 import (
 	"context"
 	"github.com/eqkez0r/gophkeep/internal/services"
-	"github.com/eqkez0r/gophkeep/internal/services/auth"
 	"github.com/eqkez0r/gophkeep/internal/services/gophkeep"
 	"github.com/eqkez0r/gophkeep/internal/storage"
 	"go.uber.org/zap"
@@ -24,7 +23,6 @@ func New(
 		return nil, err
 	}
 	s := []services.Service{
-		auth.New(logger, store, cfg.AuthServiceAddr),
 		gophkeep.New(logger, store, cfg.KeeperServiceAddr),
 	}
 	return &App{

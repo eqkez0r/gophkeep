@@ -8,6 +8,7 @@ import (
 	"google.golang.org/grpc"
 	"google.golang.org/grpc/codes"
 	"google.golang.org/grpc/status"
+	"strings"
 	"time"
 )
 
@@ -22,30 +23,32 @@ func Auth(
 	return func(ctx context.Context, req any, info *grpc.UnaryServerInfo, handler grpc.UnaryHandler) (interface{}, error) {
 		namedLogger := logger.Named("Authentication")
 		namedLogger.Debug(info.FullMethod)
-		token := getToken(req)
-		if token == "" {
-			return nil, status.Error(codes.Unauthenticated, "Token is empty")
+		if !strings.Contains(info.FullMethod, "Auth") && !strings.Contains(info.FullMethod, "Register") {
+			token := getToken(req)
+			if token == "" {
+				return nil, status.Error(codes.Unauthenticated, "Token is empty")
+			}
+			login, t, err := jwt.JWTPayload(token)
+			if err != nil {
+				namedLogger.Error(info.FullMethod + ": " + err.Error())
+				return nil, err
+			}
+			ok, err := storage.IsUserExist(ctx, login)
+			if err != nil {
+				namedLogger.Error(info.FullMethod + ": " + err.Error())
+				return nil, err
+			}
+			if !ok {
+				namedLogger.Error(info.FullMethod + ": user is not exist")
+				return nil, status.Errorf(codes.Aborted, "user is not exist")
+			}
+			tOk := time.Now().After(t)
+			if tOk {
+				namedLogger.Info(info.FullMethod + ": token expired")
+				return nil, status.Errorf(codes.Aborted, "token expired")
+			}
+			ctx = context.WithValue(ctx, "login", login)
 		}
-		login, t, err := jwt.JWTPayload(token)
-		if err != nil {
-			namedLogger.Error(info.FullMethod + ": " + err.Error())
-			return nil, err
-		}
-		ok, err := storage.IsUserExist(ctx, login)
-		if err != nil {
-			namedLogger.Error(info.FullMethod + ": " + err.Error())
-			return nil, err
-		}
-		if !ok {
-			namedLogger.Error(info.FullMethod + ": user is not exist")
-			return nil, status.Errorf(codes.Aborted, "user is not exist")
-		}
-		tOk := t.After(time.Now())
-		if tOk {
-			namedLogger.Info(info.FullMethod + ": token expired")
-			return nil, status.Errorf(codes.Aborted, "token expired")
-		}
-		ctx = context.WithValue(ctx, "login", login)
 		return handler(ctx, req)
 	}
 }

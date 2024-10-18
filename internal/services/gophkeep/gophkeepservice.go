@@ -5,42 +5,30 @@ import (
 	"errors"
 	pb "github.com/eqkez0r/gophkeep-grpc-api/pkg"
 	"github.com/eqkez0r/gophkeep/internal/services/interceptors"
+	"github.com/eqkez0r/gophkeep/internal/storage"
 	se "github.com/eqkez0r/gophkeep/internal/storage/storageerrors"
+	"github.com/eqkez0r/gophkeep/pkg/cipher"
+	"github.com/eqkez0r/gophkeep/pkg/jwt"
 	"go.uber.org/zap"
 	"google.golang.org/grpc"
 	"google.golang.org/grpc/reflection"
 	"net"
+	"strconv"
 	"sync"
 )
 
 type GophKeepService struct {
 	logger     *zap.SugaredLogger
-	storage    StorageKeeperProvider
+	storage    storage.Storage
 	grpcServer *grpc.Server
 	host       string
 
 	pb.UnimplementedGophKeeperServer
 }
 
-type StorageKeeperProvider interface {
-	IsUserExist(context.Context, string) (bool, error)
-
-	NewCredentials(context.Context, string, string, string, string) error
-	GetCredentials(context.Context, string, string) (string, string, error)
-	CredentialList(context.Context, string) ([]string, error)
-
-	NewText(context.Context, string, string, string) error
-	GetText(context.Context, string, string) (string, error)
-	TextList(context.Context, string) ([]string, error)
-
-	NewCard(context.Context, string, string, string, string, string, int32) error
-	GetCard(context.Context, string, string) (string, string, string, int32, error)
-	CardList(context.Context, string) ([]string, error)
-}
-
 func New(
 	logger *zap.SugaredLogger,
-	store StorageKeeperProvider,
+	store storage.Storage,
 	host string,
 ) *GophKeepService {
 	grpcServer := grpc.NewServer(grpc.ChainUnaryInterceptor(
@@ -80,9 +68,75 @@ func (gs *GophKeepService) GracefulShutdown() {
 	gs.grpcServer.GracefulStop()
 }
 
+func (gs *GophKeepService) Auth(ctx context.Context, req *pb.AuthRequest) (*pb.AuthResponse, error) {
+
+	err := gs.storage.ValidateUser(ctx, req.Login, req.Password)
+	if err != nil {
+		gs.logger.Errorw("failed to validate user", "login", req.Login, "error", err)
+		return &pb.AuthResponse{
+			State: pb.AuthState_AUTH_FAILED,
+		}, err
+	}
+	token, err := jwt.CreateJWT(req.Login)
+	if err != nil {
+		gs.logger.Errorw("failed to generate token", "login", req.Login, "error", err)
+		return &pb.AuthResponse{
+			State: pb.AuthState_AUTH_ERROR,
+			Token: nil,
+		}, err
+	}
+	return &pb.AuthResponse{
+		State: pb.AuthState_AUTH_SUCCESS,
+		Token: &token,
+	}, nil
+}
+
+func (gs *GophKeepService) Register(ctx context.Context, req *pb.RegisterRequest) (*pb.RegisterResponse, error) {
+	pass, err := cipher.EncryptData([]byte(req.Password))
+	if err != nil {
+		gs.logger.Errorw("failed to encrypt password", "error", err)
+		return &pb.RegisterResponse{
+			State: pb.RegisterState_REGISTER_FAILED,
+		}, err
+	}
+	err = gs.storage.NewUser(ctx, req.Login, string(pass))
+	if err != nil {
+		//TODO here need check error from POSTGRES OR make union error for storage
+		gs.logger.Errorw("failed to create user", "login", req.Login, "error", err)
+		return &pb.RegisterResponse{
+			State: pb.RegisterState_REGISTER_FAILED,
+		}, err
+	}
+	token, err := jwt.CreateJWT(req.Login)
+	if err != nil {
+		gs.logger.Errorw("failed to create JWT", "login", req.Login, "error", err)
+		return &pb.RegisterResponse{
+			State: pb.RegisterState_REGISTER_ERROR,
+		}, err
+	}
+	return &pb.RegisterResponse{
+		State: pb.RegisterState_REGISTER_SUCCESS,
+		Token: &token,
+	}, nil
+}
+
 func (gs *GophKeepService) SendCredentials(ctx context.Context, req *pb.SendCredentialsRequest) (*pb.SendCredentialsResponse, error) {
 	login := ctx.Value("login").(string)
-	err := gs.storage.NewCredentials(ctx, login, req.Credential.CredentialsName, req.Credential.Login, req.Credential.Password)
+	encryptedLogin, err := cipher.EncryptData([]byte(req.Credential.Login))
+	if err != nil {
+		gs.logger.Errorw("Failed to decrypt credentials", "error", err)
+		return &pb.SendCredentialsResponse{
+			State: pb.SendDataState_SEND_DATA_ERROR,
+		}, err
+	}
+	encryptedPassword, err := cipher.EncryptData([]byte(req.Credential.Password))
+	if err != nil {
+		gs.logger.Errorw("Failed to decrypt credentials", "error", err)
+		return &pb.SendCredentialsResponse{
+			State: pb.SendDataState_SEND_DATA_ERROR,
+		}, err
+	}
+	err = gs.storage.NewCredentials(ctx, login, req.Credential.CredentialsName, string(encryptedLogin), string(encryptedPassword))
 	if err != nil {
 		gs.logger.Errorw("Failed to create credentials", "error", err)
 		var state pb.SendDataState
@@ -117,11 +171,25 @@ func (gs *GophKeepService) GetCredentials(ctx context.Context, req *pb.GetCreden
 			State: state,
 		}, err
 	}
+	decryptedlog, err := cipher.DecryptData([]byte(log))
+	if err != nil {
+		gs.logger.Errorw("Failed to decrypt credentials", "error", err)
+		return &pb.GetCredentialsResponse{
+			State: pb.GetDataState_GET_DATA_ERROR,
+		}, err
+	}
+	decryptedpass, err := cipher.DecryptData([]byte(pass))
+	if err != nil {
+		gs.logger.Errorw("Failed to decrypt credentials", "error", err)
+		return &pb.GetCredentialsResponse{
+			State: pb.GetDataState_GET_DATA_ERROR,
+		}, err
+	}
 	return &pb.GetCredentialsResponse{
 		Credentials: &pb.Credentials{
 			CredentialsName: req.CredentialName,
-			Login:           log,
-			Password:        pass,
+			Login:           string(decryptedlog),
+			Password:        string(decryptedpass),
 		},
 		State: pb.GetDataState_GET_DATA_SUCCESS,
 	}, nil
@@ -129,7 +197,14 @@ func (gs *GophKeepService) GetCredentials(ctx context.Context, req *pb.GetCreden
 
 func (gs *GophKeepService) SendText(ctx context.Context, req *pb.SendTextRequest) (*pb.SendTextResponse, error) {
 	login := ctx.Value("login").(string)
-	err := gs.storage.NewText(ctx, login, req.Text.TextName, req.Text.Text)
+	encryptText, err := cipher.EncryptData([]byte(req.Text.Text))
+	if err != nil {
+		gs.logger.Errorw("Failed to encrypt text", "error", err)
+		return &pb.SendTextResponse{
+			State: pb.SendDataState_SEND_DATA_ERROR,
+		}, err
+	}
+	err = gs.storage.NewText(ctx, login, req.Text.TextName, string(encryptText))
 	if err != nil {
 		gs.logger.Errorw("Failed to create text", "error", err)
 		var state pb.SendDataState
@@ -143,7 +218,6 @@ func (gs *GophKeepService) SendText(ctx context.Context, req *pb.SendTextRequest
 			State: state,
 		}, nil
 	}
-
 	return &pb.SendTextResponse{
 		State: pb.SendDataState_SEND_DATA_SUCCESS,
 	}, nil
@@ -165,18 +239,56 @@ func (gs *GophKeepService) GetText(ctx context.Context, req *pb.GetTextRequest) 
 			State: state,
 		}, err
 	}
+	decryptedText, err := cipher.DecryptData([]byte(text))
+	if err != nil {
+		gs.logger.Errorw("Failed to decrypt text", "error", err)
+		return &pb.GetTextResponse{
+			State: pb.GetDataState_GET_DATA_ERROR,
+		}, err
+	}
 	return &pb.GetTextResponse{
 		State: pb.GetDataState_GET_DATA_SUCCESS,
 		Text: &pb.Text{
-			Text:     text,
 			TextName: req.TextName,
+			Text:     string(decryptedText),
 		},
 	}, nil
 }
 
 func (gs *GophKeepService) SendCard(ctx context.Context, req *pb.SendCardRequest) (*pb.SendCardResponse, error) {
 	login := ctx.Value("login").(string)
-	err := gs.storage.NewCard(ctx, login, req.Card.CardName, req.Card.CardNumber, req.Card.CardHolderName, req.Card.ExpirationDate, req.Card.Cvv)
+	ecnryptCardNumber, err := cipher.EncryptData([]byte(req.Card.CardNumber))
+	if err != nil {
+		gs.logger.Errorw("Failed to encrypt card number", "error", err)
+		return &pb.SendCardResponse{
+			State: pb.SendDataState_SEND_DATA_ERROR,
+		}, err
+	}
+	encryptCardHolderName, err := cipher.EncryptData([]byte(req.Card.CardHolderName))
+	if err != nil {
+		gs.logger.Errorw("Failed to encrypt cardholder name", "error", err)
+		return &pb.SendCardResponse{
+			State: pb.SendDataState_SEND_DATA_ERROR,
+		}, err
+	}
+	ecnryptExpirationDate, err := cipher.EncryptData([]byte(req.Card.ExpirationDate))
+	if err != nil {
+		gs.logger.Errorw("Failed to encrypt expiration date", "error", err)
+		return &pb.SendCardResponse{
+			State: pb.SendDataState_SEND_DATA_ERROR,
+		}, err
+	}
+	cvv := strconv.Itoa(int(req.Card.Cvv))
+	ecnryptCVV, err := cipher.EncryptData([]byte(cvv))
+	if err != nil {
+		gs.logger.Errorw("Failed to decrypt CVV", "error", err)
+		return &pb.SendCardResponse{
+			State: pb.SendDataState_SEND_DATA_ERROR,
+		}, err
+	}
+	err = gs.storage.NewCard(ctx, login, req.Card.CardName,
+		string(ecnryptCardNumber), string(encryptCardHolderName),
+		string(ecnryptExpirationDate), string(ecnryptCVV))
 	if err != nil {
 		gs.logger.Errorw("Failed to create card", "error", err)
 		var state pb.SendDataState
@@ -209,15 +321,50 @@ func (gs *GophKeepService) GetCard(ctx context.Context, req *pb.GetCardRequest) 
 		}
 		return &pb.GetCardResponse{
 			State: state,
-		}, nil
+		}, err
+	}
+	decryptCardNumber, err := cipher.DecryptData([]byte(cardNumber))
+	if err != nil {
+		gs.logger.Errorw("Failed to decrypt card", "error", err)
+		return &pb.GetCardResponse{
+			State: pb.GetDataState_GET_DATA_ERROR,
+		}, err
+	}
+	decryptCardHolderName, err := cipher.DecryptData([]byte(cardHolderName))
+	if err != nil {
+		gs.logger.Errorw("Failed to decrypt cardholder", "error", err)
+		return &pb.GetCardResponse{
+			State: pb.GetDataState_GET_DATA_ERROR,
+		}, err
+	}
+	decryptExpirationDate, err := cipher.DecryptData([]byte(expirationDate))
+	if err != nil {
+		gs.logger.Errorw("Failed to decrypt expiration date", "error", err)
+		return &pb.GetCardResponse{
+			State: pb.GetDataState_GET_DATA_ERROR,
+		}, err
+	}
+	decryptCVV, err := cipher.DecryptData([]byte(cvv))
+	if err != nil {
+		gs.logger.Errorw("Failed to decrypt CVV", "error", err)
+		return &pb.GetCardResponse{
+			State: pb.GetDataState_GET_DATA_ERROR,
+		}, err
+	}
+	cvvInt, err := strconv.ParseInt(string(decryptCVV), 10, 32)
+	if err != nil {
+		gs.logger.Errorw("Failed to parse CVV", "error", err)
+		return &pb.GetCardResponse{
+			State: pb.GetDataState_GET_DATA_ERROR,
+		}, err
 	}
 	return &pb.GetCardResponse{
 		State: pb.GetDataState_GET_DATA_SUCCESS,
 		Card: &pb.Card{
-			CardNumber:     cardNumber,
-			CardHolderName: cardHolderName,
-			ExpirationDate: expirationDate,
-			Cvv:            cvv,
+			CardNumber:     string(decryptCardNumber),
+			CardHolderName: string(decryptCardHolderName),
+			ExpirationDate: string(decryptExpirationDate),
+			Cvv:            int32(cvvInt),
 		},
 	}, nil
 }

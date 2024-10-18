@@ -9,6 +9,9 @@ services:
       - POSTGRES_USER=postgres
       - POSTGRES_PASSWORD=postgres
       - PGDATA=/var/lib/postgresql/data
+      - LANGUAGE=en_US:en
+      - LC_ALL=en_US:en
+      - LANG=C.UTF-8
     ports:
       - "127.0.0.1:5432:5432"
     volumes:

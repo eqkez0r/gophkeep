@@ -70,9 +70,9 @@ func (m *memoryStorage) NewCredentials(ctx context.Context, login, credentialNam
 		mp = map[string]models.Credentials{}
 	}
 	mp[credentialName] = models.Credentials{
-		credentialName,
-		credentialLogin,
-		credentialPassword,
+		CredentialsName: credentialName,
+		Login:           credentialLogin,
+		Password:        credentialPassword,
 	}
 	m.credentials[login] = mp
 	return nil
@@ -114,8 +114,8 @@ func (m *memoryStorage) NewText(ctx context.Context, login, textname, text strin
 		mp = map[string]models.Text{}
 	}
 	mp[textname] = models.Text{
-		textname,
-		text,
+		TextName: textname,
+		Text:     text,
 	}
 	m.texts[login] = mp
 	return nil
@@ -149,7 +149,7 @@ func (m *memoryStorage) TextList(ctx context.Context, login string) ([]string, e
 	return texts, nil
 }
 
-func (m *memoryStorage) NewCard(ctx context.Context, login, cardName, cardNumber, cardholder, expirationDate string, cvv int32) error {
+func (m *memoryStorage) NewCard(ctx context.Context, login, cardName, cardNumber, cardholder, expirationDate, cvv string) error {
 	m.mu.Lock()
 	defer m.mu.Unlock()
 	mp, ok := m.cards[login]
@@ -157,26 +157,26 @@ func (m *memoryStorage) NewCard(ctx context.Context, login, cardName, cardNumber
 		mp = map[string]models.Card{}
 	}
 	mp[cardName] = models.Card{
-		cardName,
-		cardNumber,
-		cardholder,
-		expirationDate,
-		cvv,
+		CardName:       cardName,
+		CardNumber:     cardNumber,
+		CardHolderName: cardholder,
+		ExpirationDate: expirationDate,
+		CVV:            cvv,
 	}
 	m.cards[login] = mp
 	return nil
 }
 
-func (m *memoryStorage) GetCard(ctx context.Context, login, cardname string) (string, string, string, int32, error) {
+func (m *memoryStorage) GetCard(ctx context.Context, login, cardname string) (string, string, string, string, error) {
 	m.mu.RLock()
 	defer m.mu.RUnlock()
 	mp, ok := m.cards[login]
 	if !ok {
-		return "", "", "", 0, se.ErrCardNotFound
+		return "", "", "", "", se.ErrCardNotFound
 	}
 	card, ok := mp[cardname]
 	if !ok {
-		return "", "", "", 0, se.ErrCardNotFound
+		return "", "", "", "", se.ErrCardNotFound
 	}
 	return card.CardNumber, card.CardHolderName, card.ExpirationDate, card.CVV, nil
 }

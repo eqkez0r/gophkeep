@@ -5,5 +5,5 @@ type Card struct {
 	CardNumber     string `json:"card_number"`
 	CardHolderName string `json:"card_holder_name"`
 	ExpirationDate string `json:"expiration_date"`
-	CVV            int32  `json:"cvv"`
+	CVV            string `json:"cvv"`
 }

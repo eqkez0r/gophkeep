@@ -24,8 +24,8 @@ type Storage interface {
 	TextList(context.Context, string) ([]string, error)
 
 	//login,cardname,cardnumber,cardholder,expirationDate,ccv
-	NewCard(context.Context, string, string, string, string, string, int32) error
-	GetCard(context.Context, string, string) (string, string, string, int32, error)
+	NewCard(context.Context, string, string, string, string, string, string) error
+	GetCard(context.Context, string, string) (string, string, string, string, error)
 	CardList(context.Context, string) ([]string, error)
 }
 
