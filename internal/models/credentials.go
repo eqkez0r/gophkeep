@@ -1,4 +1,4 @@
-package credentials
+package models
 
 type Credentials struct {
 	CredentialsName string `json:"credentials_name"`

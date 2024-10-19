@@ -1,0 +1,22 @@
+version: '3'
+
+includes:
+  os:
+    taskfile: ./Taskfile_{{OS}}.yaml
+
+tasks:
+
+  build:
+    description: build app
+    aliases:
+      - b
+    cmds:
+      - task: os:build
+
+  test:
+    description: run go tests
+    aliases:
+      - t
+    cmds:
+      - go vet -v ./...
+      - go test -v ./...
