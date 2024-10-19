@@ -430,10 +430,8 @@ func (c *cli) dataList() error {
 	return nil
 }
 
-func (c *cli) logout() error {
+func (c *cli) logout() {
 	c.resetAuth()
-	fmt.Println("enter logout please:")
-	return nil
 }
 
 //func (c *cli) checkAuth() bool {
