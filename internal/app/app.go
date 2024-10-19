@@ -17,8 +17,9 @@ type App struct {
 func New(
 	logger *zap.SugaredLogger,
 	store storage.Storage,
+	configPath string,
 ) (*App, error) {
-	cfg, err := initConfig()
+	cfg, err := initConfig(configPath)
 	if err != nil {
 		return nil, err
 	}

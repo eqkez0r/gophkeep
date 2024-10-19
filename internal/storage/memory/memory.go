@@ -4,6 +4,7 @@ import (
 	"context"
 	"github.com/eqkez0r/gophkeep/internal/models"
 	se "github.com/eqkez0r/gophkeep/internal/storage/storageerrors"
+	"github.com/eqkez0r/gophkeep/pkg/cipher"
 	"sync"
 )
 
@@ -56,7 +57,11 @@ func (m *memoryStorage) ValidateUser(ctx context.Context, login, password string
 	if !ok {
 		return se.ErrUserNotFound
 	}
-	if pass != password {
+	depass, err := cipher.DecryptData([]byte(pass))
+	if err != nil {
+		return err
+	}
+	if string(depass) != password {
 		return se.ErrInvalidAuthParameters
 	}
 	return nil

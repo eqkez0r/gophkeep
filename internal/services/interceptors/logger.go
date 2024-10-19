@@ -13,9 +13,12 @@ func LoggerInterceptor(
 	return func(ctx context.Context, req any, info *grpc.UnaryServerInfo, handler grpc.UnaryHandler) (any, error) {
 		now := time.Now()
 		var resp interface{}
-		defer logger.Infoln("Method", info.FullMethod,
-			"Request", req,
-			"Duration", time.Since(now))
+		defer func() {
+			since := time.Since(now)
+			logger.Infoln("Method", info.FullMethod,
+				"Request", req,
+				"Duration", since)
+		}()
 		resp, err := handler(ctx, req)
 		if err != nil {
 			return nil, err

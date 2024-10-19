@@ -3,6 +3,7 @@ package interceptors
 import (
 	"context"
 	goph_keeper_v1 "github.com/eqkez0r/gophkeep-grpc-api/pkg"
+	"github.com/eqkez0r/gophkeep/internal/services/servicestype"
 	"github.com/eqkez0r/gophkeep/pkg/jwt"
 	"go.uber.org/zap"
 	"google.golang.org/grpc"
@@ -47,7 +48,7 @@ func Auth(
 				namedLogger.Info(info.FullMethod + ": token expired")
 				return nil, status.Errorf(codes.Aborted, "token expired")
 			}
-			ctx = context.WithValue(ctx, "login", login)
+			ctx = context.WithValue(ctx, servicestype.KeyType("login"), login)
 		}
 		return handler(ctx, req)
 	}

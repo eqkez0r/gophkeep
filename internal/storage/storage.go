@@ -3,9 +3,8 @@ package storage
 import (
 	"context"
 	"github.com/eqkez0r/gophkeep/internal/storage/memory"
-	"github.com/eqkez0r/gophkeep/internal/storage/pgx"
+	"github.com/eqkez0r/gophkeep/internal/storage/postgres"
 	se "github.com/eqkez0r/gophkeep/internal/storage/storageerrors"
-	"log"
 )
 
 type Storage interface {
@@ -29,17 +28,16 @@ type Storage interface {
 	CardList(context.Context, string) ([]string, error)
 }
 
-func New() (Storage, error) {
-	cfg, err := initConfig()
+func New(configPath string) (Storage, error) {
+	cfg, err := initConfig(configPath)
 	if err != nil {
 		return nil, err
 	}
-	log.Printf("store cfg %v", cfg)
 	switch cfg.DatabaseType {
 	case "memory":
 		return memory.New(), nil
 	case "postgres":
-		return pgx.New(cfg.DatabaseURL)
+		return postgres.New(cfg.DatabaseURL)
 	}
 	return nil, se.ErrUnknownDatabaseType
 }

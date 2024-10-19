@@ -5,6 +5,7 @@ import (
 	"errors"
 	pb "github.com/eqkez0r/gophkeep-grpc-api/pkg"
 	"github.com/eqkez0r/gophkeep/internal/services/interceptors"
+	"github.com/eqkez0r/gophkeep/internal/services/servicestype"
 	"github.com/eqkez0r/gophkeep/internal/storage"
 	se "github.com/eqkez0r/gophkeep/internal/storage/storageerrors"
 	"github.com/eqkez0r/gophkeep/pkg/cipher"
@@ -121,7 +122,7 @@ func (gs *GophKeepService) Register(ctx context.Context, req *pb.RegisterRequest
 }
 
 func (gs *GophKeepService) SendCredentials(ctx context.Context, req *pb.SendCredentialsRequest) (*pb.SendCredentialsResponse, error) {
-	login := ctx.Value("login").(string)
+	login := ctx.Value("login").(servicestype.KeyType)
 	encryptedLogin, err := cipher.EncryptData([]byte(req.Credential.Login))
 	if err != nil {
 		gs.logger.Errorw("Failed to decrypt credentials", "error", err)
@@ -136,7 +137,7 @@ func (gs *GophKeepService) SendCredentials(ctx context.Context, req *pb.SendCred
 			State: pb.SendDataState_SEND_DATA_ERROR,
 		}, err
 	}
-	err = gs.storage.NewCredentials(ctx, login, req.Credential.CredentialsName, string(encryptedLogin), string(encryptedPassword))
+	err = gs.storage.NewCredentials(ctx, string(login), req.Credential.CredentialsName, string(encryptedLogin), string(encryptedPassword))
 	if err != nil {
 		gs.logger.Errorw("Failed to create credentials", "error", err)
 		var state pb.SendDataState
@@ -156,8 +157,8 @@ func (gs *GophKeepService) SendCredentials(ctx context.Context, req *pb.SendCred
 }
 
 func (gs *GophKeepService) GetCredentials(ctx context.Context, req *pb.GetCredentialsRequest) (*pb.GetCredentialsResponse, error) {
-	login := ctx.Value("login").(string)
-	log, pass, err := gs.storage.GetCredentials(ctx, login, req.CredentialName)
+	login := ctx.Value("login").(servicestype.KeyType)
+	log, pass, err := gs.storage.GetCredentials(ctx, string(login), req.CredentialName)
 	if err != nil {
 		gs.logger.Errorw("Failed to get credentials", "error", err)
 		var state pb.GetDataState
@@ -196,7 +197,7 @@ func (gs *GophKeepService) GetCredentials(ctx context.Context, req *pb.GetCreden
 }
 
 func (gs *GophKeepService) SendText(ctx context.Context, req *pb.SendTextRequest) (*pb.SendTextResponse, error) {
-	login := ctx.Value("login").(string)
+	login := ctx.Value("login").(servicestype.KeyType)
 	encryptText, err := cipher.EncryptData([]byte(req.Text.Text))
 	if err != nil {
 		gs.logger.Errorw("Failed to encrypt text", "error", err)
@@ -204,7 +205,7 @@ func (gs *GophKeepService) SendText(ctx context.Context, req *pb.SendTextRequest
 			State: pb.SendDataState_SEND_DATA_ERROR,
 		}, err
 	}
-	err = gs.storage.NewText(ctx, login, req.Text.TextName, string(encryptText))
+	err = gs.storage.NewText(ctx, string(login), req.Text.TextName, string(encryptText))
 	if err != nil {
 		gs.logger.Errorw("Failed to create text", "error", err)
 		var state pb.SendDataState
@@ -224,8 +225,8 @@ func (gs *GophKeepService) SendText(ctx context.Context, req *pb.SendTextRequest
 }
 
 func (gs *GophKeepService) GetText(ctx context.Context, req *pb.GetTextRequest) (*pb.GetTextResponse, error) {
-	login := ctx.Value("login").(string)
-	text, err := gs.storage.GetText(ctx, login, req.TextName)
+	login := ctx.Value("login").(servicestype.KeyType)
+	text, err := gs.storage.GetText(ctx, string(login), req.TextName)
 	if err != nil {
 		gs.logger.Errorw("Failed to get text", "error", err)
 		var state pb.GetDataState
@@ -256,7 +257,7 @@ func (gs *GophKeepService) GetText(ctx context.Context, req *pb.GetTextRequest) 
 }
 
 func (gs *GophKeepService) SendCard(ctx context.Context, req *pb.SendCardRequest) (*pb.SendCardResponse, error) {
-	login := ctx.Value("login").(string)
+	login := ctx.Value("login").(servicestype.KeyType)
 	ecnryptCardNumber, err := cipher.EncryptData([]byte(req.Card.CardNumber))
 	if err != nil {
 		gs.logger.Errorw("Failed to encrypt card number", "error", err)
@@ -286,7 +287,7 @@ func (gs *GophKeepService) SendCard(ctx context.Context, req *pb.SendCardRequest
 			State: pb.SendDataState_SEND_DATA_ERROR,
 		}, err
 	}
-	err = gs.storage.NewCard(ctx, login, req.Card.CardName,
+	err = gs.storage.NewCard(ctx, string(login), req.Card.CardName,
 		string(ecnryptCardNumber), string(encryptCardHolderName),
 		string(ecnryptExpirationDate), string(ecnryptCVV))
 	if err != nil {
@@ -308,8 +309,8 @@ func (gs *GophKeepService) SendCard(ctx context.Context, req *pb.SendCardRequest
 }
 
 func (gs *GophKeepService) GetCard(ctx context.Context, req *pb.GetCardRequest) (*pb.GetCardResponse, error) {
-	login := ctx.Value("login").(string)
-	cardNumber, cardHolderName, expirationDate, cvv, err := gs.storage.GetCard(ctx, login, req.CardName)
+	login := ctx.Value("login").(servicestype.KeyType)
+	cardNumber, cardHolderName, expirationDate, cvv, err := gs.storage.GetCard(ctx, string(login), req.CardName)
 	if err != nil {
 		gs.logger.Errorw("Failed to get card", "error", err)
 		var state pb.GetDataState
@@ -370,22 +371,22 @@ func (gs *GophKeepService) GetCard(ctx context.Context, req *pb.GetCardRequest) 
 }
 
 func (gs *GophKeepService) Sync(ctx context.Context, req *pb.SyncRequest) (*pb.SyncResponse, error) {
-	login := ctx.Value("login").(string)
-	texts, err := gs.storage.TextList(ctx, login)
+	login := ctx.Value("login").(servicestype.KeyType)
+	texts, err := gs.storage.TextList(ctx, string(login))
 	if err != nil {
 		gs.logger.Errorw("Failed to get text list", "error", err)
 		return &pb.SyncResponse{
 			State: pb.GetDataState_GET_DATA_ERROR,
 		}, err
 	}
-	credentials, err := gs.storage.CredentialList(ctx, login)
+	credentials, err := gs.storage.CredentialList(ctx, string(login))
 	if err != nil {
 		gs.logger.Errorw("Failed to get credential list", "error", err)
 		return &pb.SyncResponse{
 			State: pb.GetDataState_GET_DATA_ERROR,
 		}, err
 	}
-	cards, err := gs.storage.CardList(ctx, login)
+	cards, err := gs.storage.CardList(ctx, string(login))
 	if err != nil {
 		gs.logger.Errorw("Failed to get card list", "error", err)
 		return &pb.SyncResponse{

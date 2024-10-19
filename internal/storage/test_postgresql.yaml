@@ -1,0 +1,2 @@
+database_type: "postgres"
+database_url: "postgres://postgres:postgres@localhost:5432/gophkeeper"

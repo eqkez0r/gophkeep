@@ -17,11 +17,11 @@ func main() {
 	if err != nil {
 		log.Fatal(err)
 	}
-	store, err := storage.New()
+	store, err := storage.New("")
 	if err != nil {
 		log.Fatal(err)
 	}
-	a, err := app.New(log, store)
+	a, err := app.New(log, store, "")
 	if err != nil {
 		log.Fatal(err)
 	}

@@ -4,6 +4,7 @@ import (
 	"bufio"
 	"fmt"
 	"github.com/eqkez0r/gophkeep/internal/client"
+	"github.com/eqkez0r/gophkeep/pkg/checkers"
 	"log"
 	"os"
 	"strconv"
@@ -207,6 +208,7 @@ func (c *cli) sendCard() error {
 	}
 	cardName = strings.TrimSpace(cardName)
 
+enterNumber:
 	fmt.Println("enter send card number please:")
 	cardNumber, err := c.reader.ReadString('\n')
 	if err != nil {
@@ -214,6 +216,10 @@ func (c *cli) sendCard() error {
 		return err
 	}
 	cardNumber = strings.TrimSpace(cardNumber)
+	if !checkers.CreditCardNumberCheck(cardNumber) {
+		fmt.Println("card number is invalid. try again")
+		goto enterNumber
+	}
 
 	fmt.Println("enter send cardholder name please:")
 	cardHolderName, err := c.reader.ReadString('\n')
@@ -223,6 +229,7 @@ func (c *cli) sendCard() error {
 	}
 	cardHolderName = strings.TrimSpace(cardHolderName)
 
+enterExpiration:
 	fmt.Println("enter send card expiration time please:")
 	cardExpiration, err := c.reader.ReadString('\n')
 	if err != nil {
@@ -230,6 +237,11 @@ func (c *cli) sendCard() error {
 		return err
 	}
 	cardExpiration = strings.TrimSpace(cardExpiration)
+	if !checkers.CreditCardExpirationCheck(cardExpiration) {
+		fmt.Println("card expiration time is invalid. try again")
+		goto enterExpiration
+	}
+
 enterCVV:
 	fmt.Println("enter send card cvv token please:")
 	cvv, err := c.reader.ReadString('\n')
@@ -238,15 +250,15 @@ enterCVV:
 		return err
 	}
 	cvv = strings.TrimSpace(cvv)
+	if !checkers.CreditCardCVVCheck(cvv) {
+		fmt.Println("card cvv token is invalid. try again")
+		goto enterCVV
+	}
 
 	cvvInt, err := strconv.Atoi(cvv)
 	if err != nil {
 		fmt.Printf("input err %v", err)
 		return err
-	}
-	if cvvInt <= 0 || cvvInt >= 1000 {
-		fmt.Printf("invalid cvv, try again")
-		goto enterCVV
 	}
 
 	err = c.client.SendCard(c.token, cardName, cardNumber, cardHolderName, cardExpiration, int32(cvvInt))

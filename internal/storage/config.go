@@ -9,12 +9,14 @@ type config struct {
 	DatabaseURL  string `json:"database_url" yaml:"database_url" env:"database_url"`
 }
 
-func initConfig() (*config, error) {
+func initConfig(configPath string) (*config, error) {
 	const defaultPath = "./config.yaml"
-
+	if configPath == "" {
+		configPath = defaultPath
+	}
 	cfg := &config{}
 
-	err := cleanenv.ReadConfig(defaultPath, cfg)
+	err := cleanenv.ReadConfig(configPath, cfg)
 	if err != nil {
 		return nil, err
 	}
