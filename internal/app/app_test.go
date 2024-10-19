@@ -2,9 +2,9 @@ package app
 
 import (
 	"github.com/eqkez0r/gophkeep/internal/storage"
+	"github.com/stretchr/testify/assert"
 	"go.uber.org/zap"
 	"go.uber.org/zap/zaptest"
-	"reflect"
 	"testing"
 )
 
@@ -42,7 +42,7 @@ func TestNew(t *testing.T) {
 				t.Errorf("New() error = %v, wantErr %v", err, tt.wantErr)
 				return
 			}
-			if !reflect.DeepEqual(got, tt.want) {
+			if !assert.Equal(t, got, tt.want) {
 				t.Errorf("New() got = %v, want %v", got, tt.want)
 			}
 		})
