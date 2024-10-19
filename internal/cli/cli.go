@@ -110,10 +110,7 @@ func (c *cli) Run() {
 				continue
 			}
 		case "10":
-			err = c.logout()
-			if err != nil {
-				continue
-			}
+			c.logout()
 		case "e", "q":
 			if c.status == statusAuth {
 				c.client.Logout()
@@ -271,6 +268,7 @@ enterCVV:
 		fmt.Printf("client err %v", err)
 		return err
 	}
+	c.cards = append(c.cards, cardName)
 	return nil
 }
 
@@ -331,6 +329,7 @@ func (c *cli) sendCredentials() error {
 		fmt.Printf("client err %v", err)
 		return err
 	}
+	c.credentials = append(c.credentials, credentialName)
 	return nil
 }
 
@@ -381,7 +380,7 @@ func (c *cli) sendText() error {
 		fmt.Printf("client err %v", err)
 		return err
 	}
-
+	c.texts = append(c.texts, textName)
 	return nil
 }
 
