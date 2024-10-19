@@ -109,6 +109,11 @@ func (c *cli) Run() {
 			if err != nil {
 				continue
 			}
+		case "10":
+			err = c.logout()
+			if err != nil {
+				continue
+			}
 		case "e", "q":
 			if c.status == statusAuth {
 				c.client.Logout()
@@ -431,9 +436,9 @@ func (c *cli) logout() error {
 	return nil
 }
 
-func (c *cli) checkAuth() bool {
-	return c.client.CheckConnection()
-}
+//func (c *cli) checkAuth() bool {
+//	return c.client.CheckConnection()
+//}
 
 func (c *cli) resetAuth() {
 	c.cards = nil
